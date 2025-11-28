@@ -1,0 +1,385 @@
+{
+  "name": "CD Enrichement 2 - AI",
+  "nodes": [
+    {
+      "parameters": {
+        "queue": "company-domain-ai",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        32
+      ],
+      "id": "5a5f7590-eb3a-4cfa-83e6-e46375105b92",
+      "name": "RabbitMQ Trigger",
+      "credentials": {
+        "rabbitmq": {
+          "id": "h7fzsrX9NMsNKx7v",
+          "name": "RabbitMQ account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "tal_correlation_data",
+          "mode": "list",
+          "cachedResultName": "tal_correlation_data"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1568,
+        -64
+      ],
+      "id": "f3494ec7-db70-4ee5-9d26-33254480daa7",
+      "name": "Insert rows in a table1",
+      "credentials": {
+        "mySql": {
+          "id": "wg3yCfSW5IYdPZAz",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8ed4ca24-ac57-430b-b3e2-ad3a322cfc30",
+              "name": "company_name",
+              "value": "={{ $('Raw Data').item.json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "3519f7f6-f0b3-43f4-a4ad-2579914739de",
+              "name": "domain",
+              "value": "={{ $('Raw Data').item.json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "d4ed0b42-2c44-4648-b60a-a23ec10887b1",
+              "name": "redirect_domain",
+              "value": "={{ $('Raw Data').item.json.redirect_domain }}",
+              "type": "string"
+            },
+            {
+              "id": "926f4a40-14ed-4050-b7d3-0c89d1cb05d6",
+              "name": "status",
+              "value": "={{ $('Raw Data').item.json.status }}",
+              "type": "number"
+            },
+            {
+              "id": "bb0e38e5-2471-44b3-b54f-c41a8c9b8aff",
+              "name": "correlation",
+              "value": "={{ $json.message.content.correlation }}",
+              "type": "string"
+            },
+            {
+              "id": "6881c16c-d9ca-4799-86ff-76cbb537fb9a",
+              "name": "score",
+              "value": "={{ $json.message.content.score }}",
+              "type": "number"
+            },
+            {
+              "id": "1c201bd8-da13-4581-a277-1084bdeb384b",
+              "name": "reason",
+              "value": "={{ $json.message.content.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "b16c9ae1-f7c6-4c4f-b284-13e9a34b608c",
+              "name": "campaign_id",
+              "value": "={{ $('Raw Data').item.json.campaign_id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        32
+      ],
+      "id": "f7294182-6cb6-44d9-8e23-0086f440c6bf",
+      "name": "Output"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-5-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a company–domain correlation validation assistant.\n\n\n\nYour task is to determine whether the provided domain genuinely belongs to, represents, or is officially associated with the given company name. A fuzzy match of company name & domain is performed, if that is failed you will receive status code and html content of that data.\n\n\n\nINPUT DATA\nYou will receive structured data with the following fields:\n- company_name: The official or known name of the company.\n- domain: The domain being evaluated.\n- redirect_domain: The final destination domain (if any redirects occurred).\n- title: The HTML <title> of the page, if available.\n- body: Extracted HTML body text (cleaned).\n- status: HTTP status code returned by the domain.\n\nYOUR OUTPUT (in strict JSON format)\n{\n  \"correlation\": true or false,\n  \"score\": 0–1,\n  \"reason\": \"Short, clear explanation (1 sentence)\"\n}\n\n\n\nDECISION LOGIC & SCORING FRAMEWORK\n\n\n\nStep 1 — Domain Status\n- If statusCode is null or ≥400 → treat as **inactive or dead** (score ≤ 0.2).\n- If title/bodyContent are empty → possible **parked or placeholder domain** (score ≤ 0.3).\n- If the site redirects to another domain that does not contain or match the company name → treat as **redirected/unrelated** (score ≤ 0.4).\n\n\n\nStep 2 — Content Relevance\n- Check if the title or body content clearly refers to the company name, abbreviation, or brand.\n- If the title or content prominently contains the company name or a close match → strong correlation (score ≥ 0.8).\n\n\n\nStep 3 — Domain Semantics\n- If the domain name itself contains the company name or its abbreviation → increase confidence.\n- If the domain appears generic (e.g., using TLDs like `.xyz`, `.top`, `.site`, `.online`, `.store`, `.biz`) or belongs to a known hosting/ISP brand (e.g., godaddy, wix, squarespace, bluehost) → mark as **hosting or generic domain** (score ≤ 0.3).\n\n\n\nStep 4 — Brand Knowledge\n- Use known or common brand associations to validate legitimate rebrands or domain migrations.\n- If redirect_domain and company_name both correspond to a known relationship (e.g., old vs. new brand) → still consider valid (score 0.8–1.0).\n\n\n\nStep 5 — Final Decision\n- `correlation: true` if domain clearly represents the company, its verified brand, or a legitimate redirect/parent entity.\n- `correlation: false` if domain appears inactive, parked, generic, unrelated, or owned by a hosting provider.\n\n\n\nGENERAL RULES\n- Be conservative — only return `true` if the correlation is confidently supported.\n- Always mention *why* (e.g., “redirected”, “dead domain”, “placeholder”, “hosting provider”, “brand mismatch”).\n- Keep responses deterministic and strictly in JSON format.\n- Never add Markdown formatting or extra text before/after the JSON.\n\n\nNow, evaluate the provided company and domain data according to these rules.\n",
+              "role": "system"
+            },
+            {
+              "content": "={{ $('RabbitMQ Trigger').item.json.content }}\n"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        720,
+        32
+      ],
+      "id": "e955a89e-c10f-4ced-af3e-18820b746a23",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd565674-cd9f-4fef-8245-fe3f5a602145",
+              "name": "company_name",
+              "value": "={{ $json.content.parseJson().company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "db75cec7-c08c-4983-b8b6-62c692ddbf12",
+              "name": "domain",
+              "value": "={{ $json.content.parseJson().domain }}",
+              "type": "string"
+            },
+            {
+              "id": "08a85ad4-d589-4ffd-8858-d9542671afe7",
+              "name": "campaign_id",
+              "value": "={{ $json.content.parseJson().campaign_id}}",
+              "type": "string"
+            },
+            {
+              "id": "b887c54d-d1be-4af4-b545-49a0977fd058",
+              "name": "redirect_domain",
+              "value": "={{ $json.content.parseJson().redirect_domain }}",
+              "type": "string"
+            },
+            {
+              "id": "d753640d-2d9b-433f-b540-45b391dad3da",
+              "name": "title",
+              "value": "={{ $json.content.parseJson().title }}",
+              "type": "string"
+            },
+            {
+              "id": "ac3deed4-41fb-40c3-bfaa-8fcd86229e60",
+              "name": "body",
+              "value": "={{ $json.content.parseJson().body }}",
+              "type": "string"
+            },
+            {
+              "id": "46eb5cce-7aef-4cd8-ad93-5244e44e80ba",
+              "name": "status",
+              "value": "={{ $json.content.parseJson().status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        32
+      ],
+      "id": "82261fe7-4fb5-40da-b949-44ffb68db72c",
+      "name": "Raw Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "38896f4d-df6c-4df5-8b7f-d965e4db0c8f",
+              "leftValue": "={{ $json.message.content.correlation }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        32
+      ],
+      "id": "0c53f523-e9ca-4425-a0cb-7a8ea849ded0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "queue": "company-domain-serp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rabbitmq",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        192
+      ],
+      "id": "7e26a0a7-1506-4006-a5ba-7ca247760735",
+      "name": "RabbitMQ SERP API",
+      "credentials": {
+        "rabbitmq": {
+          "id": "h7fzsrX9NMsNKx7v",
+          "name": "RabbitMQ account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "4QiTuJ229Mgayoqd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/4QiTuJ229Mgayoqd",
+          "cachedResultName": "CD Status Update"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1856,
+        -64
+      ],
+      "id": "4b473b2c-2d3b-44c4-be93-5f163deb44ca",
+      "name": "Call 'CD Status Update'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RabbitMQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Raw Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raw Data": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RabbitMQ SERP API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table1": {
+      "main": [
+        [
+          {
+            "node": "Call 'CD Status Update'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "64794350-cf4c-49a0-98ac-fddb06d6eaa6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "fQrtniAuy0Gui96a",
+  "tags": [
+    {
+      "createdAt": "2025-11-19T07:38:26.907Z",
+      "updatedAt": "2025-11-19T07:38:26.907Z",
+      "id": "TAIcWEIA43iA00aV",
+      "name": "company-domain"
+    }
+  ]
+}

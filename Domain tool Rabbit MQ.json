@@ -1,0 +1,569 @@
+{
+  "name": "Domain tool Rabbit MQ",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8ed4ca24-ac57-430b-b3e2-ad3a322cfc30",
+              "name": "company_name",
+              "value": "={{ $('Edit Fields3').item.json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "3519f7f6-f0b3-43f4-a4ad-2579914739de",
+              "name": "domain",
+              "value": "={{ $('Edit Fields3').item.json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "926f4a40-14ed-4050-b7d3-0c89d1cb05d6",
+              "name": "status",
+              "value": "={{ $('HTTP Request1').item.json.statusCode }}",
+              "type": "string"
+            },
+            {
+              "id": "bb0e38e5-2471-44b3-b54f-c41a8c9b8aff",
+              "name": "match",
+              "value": "={{ $json.match }}",
+              "type": "string"
+            },
+            {
+              "id": "6881c16c-d9ca-4799-86ff-76cbb537fb9a",
+              "name": "score",
+              "value": "={{ $json.score }}",
+              "type": "number"
+            },
+            {
+              "id": "1c201bd8-da13-4581-a277-1084bdeb384b",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        48
+      ],
+      "id": "d281668c-ae59-44fc-a93e-5e28f545242a",
+      "name": "Edit Fields1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "tal_domain_data",
+          "mode": "list",
+          "cachedResultName": "tal_domain_data"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1248,
+        48
+      ],
+      "id": "9231f358-c160-4ccc-8d05-17ee7988d0ac",
+      "name": "Insert rows in a table1",
+      "credentials": {
+        "mySql": {
+          "id": "wg3yCfSW5IYdPZAz",
+          "name": "MySQL account 2"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd565674-cd9f-4fef-8245-fe3f5a602145",
+              "name": "company_name",
+              "value": "={{ $json.content.parseJson().company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "db75cec7-c08c-4983-b8b6-62c692ddbf12",
+              "name": "domain",
+              "value": "={{ $json.content.parseJson().domain }}",
+              "type": "string"
+            },
+            {
+              "id": "65f8ae39-8d6e-48f1-aa4f-39e12a349eb4",
+              "name": "campaign_id",
+              "value": "={{ $json.content?.parseJson().campaign_id || ''}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1296,
+        400
+      ],
+      "id": "a8f2fe3e-8b87-41c8-9d13-169df6db2d7f",
+      "name": "Edit Fields3",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "queue": "TAL-company-domain",
+        "options": {
+          "parallelMessages": 5
+        }
+      },
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1696,
+        400
+      ],
+      "id": "df240464-4fb0-4c0f-9c5f-f63c5791399f",
+      "name": "RabbitMQ Trigger",
+      "credentials": {
+        "rabbitmq": {
+          "id": "h7fzsrX9NMsNKx7v",
+          "name": "RabbitMQ account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d6e1f631-9ff2-45eb-98c4-2f0d57135a43",
+              "leftValue": "={{ $('HTTP Request1').item.json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -544,
+        384
+      ],
+      "id": "f27cd5f9-7492-428b-a45c-9db2574b9f1d",
+      "name": "If1",
+      "disabled": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "title"
+            },
+            {
+              "key": "bodyContent",
+              "cssSelector": "body"
+            }
+          ]
+        },
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        }
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -816,
+        400
+      ],
+      "id": "a9043a8d-2160-4022-84ba-4a6c4a0024a1",
+      "name": "HTML",
+      "alwaysOutputData": true,
+      "disabled": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const keyword =$('Edit Fields3').item.json.company_name.toLowerCase();\nconst title =$('HTML').item.json.title.toLowerCase();\nconst html =$('HTML').item.json.bodyContent.toLowerCase();\n\n// Normalize company names\nfunction normalizeName(name) {\n  return name\n    .replace(/\\b(ltd|limited|inc|corp|corporation|co|pvt|private|llc)\\b/g, '') // remove common suffixes\n    .replace(/[^a-z0-9\\s]/g, '')  // remove punctuation\n    .trim()\n    .replace(/\\s+/g, ' ');        // normalize spaces\n}\n\n// Normalize both\nconst cleanKeyword = normalizeName(keyword);\nconst cleanHtml = normalizeName(html);\nconst cleanTitle = normalizeName(title);\n\n// Split into words\nconst words = cleanKeyword.split(' ').filter(w => w.length > 1);\n\n// Count matching words\nlet matchCount = 0;\nfor (const w of words) {\n  if (cleanHtml.includes(w)) matchCount++;\n  else if (cleanTitle.includes(w)) matchCount++;\n}\n\n// Calculate match ratio\nconst matchRatio = matchCount / words.length;\n\n// Consider it a match if ≥ 60% of words are found\nconst isMatch = matchRatio >= 0.6;\n\nreturn {\n  match: isMatch,\n  score: matchRatio.toFixed(2),\n};\n \n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        64
+      ],
+      "id": "1c94dc56-a544-4603-a343-58bbfb75e469",
+      "name": "Code in JavaScript1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.domain }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1024,
+        400
+      ],
+      "id": "37000892-9bbd-4645-8ad9-05c6f033ca62",
+      "name": "HTTP Request1",
+      "alwaysOutputData": true,
+      "disabled": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a data validation assistant.\n\nTask:\nYou will receive a list of company names and their domains. For each pair, verify if the domain appears to belong to or represent the company. Then output a JSON array with the following fields for each company:\n\n{\n  \"match\": \"\",   //true or false\n  \"score\": \"\",          // integer 0–1 \n  \"reason\": \"\"          // short explanation (1 sentence)\n}\n\nGuidelines:\n- Use public or commonly known brand/domain associations.\n- Give \"true\" only if the domain clearly belongs to the company or its parent group.\n- Give \"false yes\" if it looks plausible but not directly confirmed or if there’s no solid evidence either way or if domain is unrelated or missing.\n- Be concise and consistent.\n\nNow verify this\nCompany Name - {{ $('Edit Fields3').item.json.company_name }}\nDomain - {{ $('Edit Fields3').item.json.domain }}\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        224
+      ],
+      "id": "1797b273-86cd-41bc-9263-cf6ad46074f4",
+      "name": "AI Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the raw text content\nconst raw = $input.first().json.output[0].text\n// Remove Markdown formatting (```json ... ```)\nconst cleaned = raw\n  .replace(/```json/g, '')  // remove opening ```json\n  .replace(/```/g, '')      // remove closing ```\n  .trim();                  // remove extra whitespace\n\n// Parse the JSON array\nconst parsed = JSON.parse(cleaned);\n\n// Return the first object in the array as item fields\nreturn parsed;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        224
+      ],
+      "id": "69140634-0270-464a-8805-320cc2a12080",
+      "name": "Code in JavaScript",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelSource": "inferenceProfile",
+        "model": "us.deepseek.r1-v1:0",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAwsBedrock",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        720
+      ],
+      "id": "1a51f123-cc25-45d1-894a-60efb8450c49",
+      "name": "AWS Bedrock Chat Model",
+      "credentials": {
+        "aws": {
+          "id": "aZzddU7JY0OGk0e7",
+          "name": "AWS account 3"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "32880134-f9a6-455f-acbf-6a9439356bb2",
+              "leftValue": "={{ $json.match }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -48,
+        64
+      ],
+      "id": "34adbdf5-9313-44ab-92e8-196f939a014b",
+      "name": "If",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "options": {
+          "maxTokens": -1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        32,
+        480
+      ],
+      "id": "93e8c515-4b88-481c-8257-be677217d63d",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        96
+      ],
+      "id": "5e0c9ef4-d11e-4411-b9d9-1cf29490c086",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "pinData": {
+    "RabbitMQ Trigger": [
+      {
+        "json": {
+          "fields": {
+            "consumerTag": "amq.ctag-s7FV_VEa5UdLvNFSgV-zag",
+            "deliveryTag": 24,
+            "redelivered": false,
+            "exchange": "",
+            "routingKey": "TAL-company-domain"
+          },
+          "properties": {
+            "headers": {}
+          },
+          "content": "{\"company_name\":\"dms digitale mess- und\",\"domain\":\"dms-ag.de\",\"campaign_id\":null}"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RabbitMQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS Bedrock Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2f69e00c-ad1d-4a36-8f34-800d74311d11",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "fvMROOxpnnx1kd3a",
+  "tags": []
+}

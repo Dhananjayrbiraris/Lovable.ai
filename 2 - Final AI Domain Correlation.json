@@ -1,0 +1,682 @@
+{
+  "name": "2 - Final AI Domain Correlation",
+  "nodes": [
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "tal_correlation_data",
+          "mode": "list",
+          "cachedResultName": "tal_correlation_data"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        3616,
+        64
+      ],
+      "id": "0a927bc0-076b-4461-ae2b-5f6950527f04",
+      "name": "Insert rows in a table1",
+      "credentials": {
+        "mySql": {
+          "id": "wg3yCfSW5IYdPZAz",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "queue": "TAL-company-domain",
+        "options": {
+          "parallelMessages": 0
+        }
+      },
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        432
+      ],
+      "id": "9964d33a-dc5e-4018-85d4-a11f162a512e",
+      "name": "RabbitMQ Trigger",
+      "credentials": {
+        "rabbitmq": {
+          "id": "h7fzsrX9NMsNKx7v",
+          "name": "RabbitMQ account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "title"
+            },
+            {
+              "key": "bodyContent",
+              "cssSelector": "body"
+            }
+          ]
+        },
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        }
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        432
+      ],
+      "id": "054cd873-657b-4cbc-a06a-e8502bf2f711",
+      "name": "HTML",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a company–domain correlation validation assistant.\n\nYour task is to determine whether the provided domain genuinely belongs to, represents, or is officially associated with the given company name.\n\n---\n\n### 🔍 INPUT DATA\nYou will receive structured data with the following fields:\n- companyName: The official or known name of the company.\n- domain: The domain being evaluated.\n- redirectDomain: The final destination domain (if any redirects occurred).\n- title: The HTML <title> of the page, if available.\n- bodyContent: Extracted HTML body text (cleaned).\n- statusCode: HTTP status code returned by the domain.\n\n---\n\n### 🎯 YOUR OUTPUT (in strict JSON format)\n{\n  \"correlation\": true or false,\n  \"score\": 0–1,\n  \"reason\": \"Short, clear explanation (1 sentence)\"\n}\n\n---\n\n### 🧠 DECISION LOGIC & SCORING FRAMEWORK\n\n**Step 1 — Domain Status**\n- If statusCode is null or ≥400 → treat as **inactive or dead** (score ≤ 0.2).\n- If title/bodyContent are empty → possible **parked or placeholder domain** (score ≤ 0.3).\n- If the site redirects to another domain that does not contain or match the company name → treat as **redirected/unrelated** (score ≤ 0.4).\n\n**Step 2 — Content Relevance**\n- Check if the title or body content clearly refers to the company name, abbreviation, or brand.\n- If the title or content prominently contains the company name or a close match → strong correlation (score ≥ 0.8).\n\n**Step 3 — Domain Semantics**\n- If the domain name itself contains the company name or its abbreviation → increase confidence.\n- If the domain appears generic (e.g., using TLDs like `.xyz`, `.top`, `.site`, `.online`, `.store`, `.biz`) or belongs to a known hosting/ISP brand (e.g., godaddy, wix, squarespace, bluehost) → mark as **hosting or generic domain** (score ≤ 0.3).\n\n**Step 4 — Brand Knowledge**\n- Use known or common brand associations (e.g., proxycrawl.com → Crawlbase) to validate legitimate rebrands or domain migrations.\n- If redirectDomain and company_name both correspond to a known relationship (e.g., old vs. new brand) → still consider valid (score 0.8–1.0).\n\n**Step 5 — Final Decision**\n- `correlation: true` if domain clearly represents the company, its verified brand, or a legitimate redirect/parent entity.\n- `correlation: false` if domain appears inactive, parked, generic, unrelated, or owned by a hosting provider.\n\n---\n\n### ⚙️ GENERAL RULES\n- Be conservative — only return `true` if the correlation is confidently supported.\n- Always mention *why* (e.g., “redirected”, “dead domain”, “placeholder”, “hosting provider”, “brand mismatch”).\n- Keep responses deterministic and strictly in JSON format.\n- Never add Markdown formatting or extra text before/after the JSON.\n\n---\nNow, evaluate the provided company and domain data according to these rules.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        2592,
+        240
+      ],
+      "id": "0b62b5de-d1b9-4713-b11e-40de7aa35e1d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        32
+      ],
+      "id": "951a2b67-3ccf-4ee9-8714-2c6c1315808e",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "gpt-5"
+        },
+        "options": {
+          "maxTokens": -1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        496
+      ],
+      "id": "3fd63ad4-5817-4e65-9d78-7890442bb550",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd565674-cd9f-4fef-8245-fe3f5a602145",
+              "name": "companyName",
+              "value": "={{ $json.content.parseJson().company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "db75cec7-c08c-4983-b8b6-62c692ddbf12",
+              "name": "domain",
+              "value": "={{ $json.content.parseJson().domain }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -448,
+        432
+      ],
+      "id": "f67be132-dde1-478a-9089-b767c5947bfa",
+      "name": "Raw Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b8a4911c-6c98-4c77-ad9d-ec3cf09e3645",
+              "leftValue": "={{ $('HTTP Redirect').item.json.statusCode }}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            },
+            {
+              "id": "5f3bbf30-17c3-4a5f-a366-3337fa91e382",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        432
+      ],
+      "id": "19512dd9-1ac2-436d-91f0-caba006c7ada",
+      "name": "IF Invalid"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bc8e64c1-46b3-41c7-9098-404266c7fa6e",
+              "name": "title",
+              "value": "={{ $('HTML').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "bb9a1618-7487-4d8d-a3be-db5b29fdce91",
+              "name": "statusCode",
+              "value": "={{ $('HTTP Redirect').item.json.statusCode }}",
+              "type": "string"
+            },
+            {
+              "id": "ba50acab-2462-4087-9567-c5289e3dc37c",
+              "name": "companyName",
+              "value": "={{ $('Raw Data').item.json.companyName }}",
+              "type": "string"
+            },
+            {
+              "id": "d2cb5c83-1f15-4b5c-98ba-104175a3eb26",
+              "name": "domain",
+              "value": "={{ $('Raw Data').item.json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "1881888d-2789-4dbe-bf2a-58e250bc21cf",
+              "name": "bodyContent",
+              "value": "={{ $('HTML').item.json.bodyContent }}",
+              "type": "string"
+            },
+            {
+              "id": "d72b6c79-538f-450f-9273-1f68d496bf18",
+              "name": "redirectDomain",
+              "value": "={{ $('Clean New Domain').item.json.redirectDomain }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2240,
+        240
+      ],
+      "id": "4b6e42ac-d579-49bb-ac3f-d68c027e0b40",
+      "name": "AI Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "32880134-f9a6-455f-acbf-6a9439356bb2",
+              "leftValue": "={{ $json.correlation }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        64
+      ],
+      "id": "f5990685-bfb9-4c70-8f2a-f9e61605c70e",
+      "name": "If Fuzzy Match"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const keyword =$('Raw Data').item.json.companyName.toLowerCase();\nconst title =$('HTML').item.json.title.toLowerCase();\nconst html =$('HTML').item.json.bodyContent.toLowerCase();\n\n// Normalize company names\nfunction normalizeName(name) {\n  return name\n    .replace(/\\b(ltd|limited|inc|corp|corporation|co|pvt|private|llc)\\b/g, '') // remove common suffixes\n    .replace(/[^a-z0-9\\s]/g, '')  // remove punctuation\n    .trim()\n    .replace(/\\s+/g, ' ');        // normalize spaces\n}\n\n// Normalize both\nconst cleanKeyword = normalizeName(keyword);\nconst cleanHtml = normalizeName(html);\nconst cleanTitle = normalizeName(title);\n\n// Split into words\nconst words = cleanKeyword.split(' ').filter(w => w.length > 1);\n\n// Count matching words\nlet matchCount = 0;\nfor (const w of words) {\n  if (cleanHtml.includes(w)) matchCount++;\n  else if (cleanTitle.includes(w)) matchCount++;\n}\n\n// Calculate match ratio\nconst matchRatio = matchCount / words.length;\n\n// Consider it a match if ≥ 60% of words are found\nconst isMatch = matchRatio >= 0.6;\n\nreturn {\n  correlation : isMatch,\n  score: matchRatio.toFixed(2),\n};\n \n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        64
+      ],
+      "id": "f2415944-db7a-4ad0-b3b4-31b288521be7",
+      "name": "Fuzzy Match"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the raw text content\nconst raw = $input.first().json.output\n// Remove Markdown formatting (```json ... ```)\nconst cleaned = raw\n  .replace(/```json/g, '')  // remove opening ```json\n  .replace(/```/g, '')      // remove closing ```\n  .trim();                  // remove extra whitespace\n\n// Parse the JSON array\nconst parsed = JSON.parse(cleaned);\n\n// Return the first object in the array as item fields\nreturn parsed;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3008,
+        240
+      ],
+      "id": "a745bca0-470a-43d9-8333-566bf53bbd5f",
+      "name": "Ai Output Parser"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.{{ $json.domain }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -144,
+        432
+      ],
+      "id": "c96650df-35f5-434e-91da-44fa61af77a8",
+      "name": "HTTP Redirect",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $('Raw Data').item.json.domain }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 3
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        432
+      ],
+      "id": "b469fbd4-62e9-4eb0-b4b6-ef681fd7f7b1",
+      "name": "HTTP",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8ed4ca24-ac57-430b-b3e2-ad3a322cfc30",
+              "name": "company_name",
+              "value": "={{ $('Raw Data').item.json.companyName }}",
+              "type": "string"
+            },
+            {
+              "id": "3519f7f6-f0b3-43f4-a4ad-2579914739de",
+              "name": "domain",
+              "value": "={{ $('Raw Data').item.json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "d4ed0b42-2c44-4648-b60a-a23ec10887b1",
+              "name": "redirect_domain",
+              "value": "={{ $('Raw Data').item.json.domain === $('Clean New Domain').item.json.redirectDomain ? '' : $('Clean New Domain').item.json.redirectDomain }}",
+              "type": "string"
+            },
+            {
+              "id": "926f4a40-14ed-4050-b7d3-0c89d1cb05d6",
+              "name": "status",
+              "value": "={{ $('Raw Data').item.json.domain === $('Clean New Domain').item.json.redirectDomain ? $('HTTP').item.json.statusCode : $('HTTP Redirect').item.json.statusCode }}",
+              "type": "number"
+            },
+            {
+              "id": "bb0e38e5-2471-44b3-b54f-c41a8c9b8aff",
+              "name": "correlation",
+              "value": "={{ $json.correlation }}",
+              "type": "string"
+            },
+            {
+              "id": "6881c16c-d9ca-4799-86ff-76cbb537fb9a",
+              "name": "score",
+              "value": "={{ $json.score }}",
+              "type": "number"
+            },
+            {
+              "id": "1c201bd8-da13-4581-a277-1084bdeb384b",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "8221ee67-d251-44ee-82e5-454725abefb9",
+              "name": "campaign_id",
+              "value": "FS147AWS",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3248,
+        64
+      ],
+      "id": "63d625c3-0711-473d-bebf-06a4c3f25f5a",
+      "name": "Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely get input data\nconst item = $input.first()?.json || {};\nconst location = item?.headers?.location;\n\n// Default clean domain\nlet cleanDomain = \"\";\n\n// Only process if 'location' exists and is a string\nif (typeof location === \"string\" && location.trim() !== \"\") {\n  try {\n    // Try parsing as a full URL\n    const url = new URL(location, \"https://fallback.com\"); // allows relative URLs\n    cleanDomain = (url.hostname || \"\").replace(/^www\\./, \"\");\n  } catch (e) {\n    // Handle malformed or partial URLs\n    cleanDomain = location\n      .replace(/^https?:\\/\\//, \"\")\n      .replace(/^www\\./, \"\")\n      .split(\"/\")[0]\n      .trim();\n  }\n}\n\n// Always return safely\nreturn {\n  redirectDomain: cleanDomain || \"\"\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        432
+      ],
+      "id": "07eed8dc-6e00-4bb8-a96b-78e184a437b6",
+      "name": "Clean New Domain"
+    }
+  ],
+  "pinData": {
+    "RabbitMQ Trigger": [
+      {
+        "json": {
+          "fields": {
+            "consumerTag": "amq.ctag-ioJ_J7BvjOGHJWxoNi8Adg",
+            "deliveryTag": 183,
+            "redelivered": false,
+            "exchange": "",
+            "routingKey": "TAL-company-domain"
+          },
+          "properties": {
+            "headers": {}
+          },
+          "content": "{\"company_name\":\"abas software\",\"domain\":\"abas-erp.com\",\"campaign_id\":null}"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "RabbitMQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Raw Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "IF Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Ai Output Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Raw Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raw Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Redirect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Invalid": {
+      "main": [
+        [
+          {
+            "node": "Fuzzy Match",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Fuzzy Match": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fuzzy Match": {
+      "main": [
+        [
+          {
+            "node": "If Fuzzy Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ai Output Parser": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Redirect": {
+      "main": [
+        [
+          {
+            "node": "Clean New Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean New Domain": {
+      "main": [
+        [
+          {
+            "node": "HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3b253565-a505-4f4c-be14-a65a47f36394",
+  "meta": {
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "BfI1cXcz2frzk637",
+  "tags": [
+    {
+      "createdAt": "2025-11-13T05:03:55.894Z",
+      "updatedAt": "2025-11-13T05:03:55.894Z",
+      "id": "kfId9vUbXyoYDQNr",
+      "name": "Moved to Prod"
+    }
+  ]
+}

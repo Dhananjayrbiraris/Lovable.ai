@@ -1,0 +1,603 @@
+{
+  "name": "CD Enrichment 3 - Serp",
+  "nodes": [
+    {
+      "parameters": {
+        "queue": "company-domain-serp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        16
+      ],
+      "id": "2cfcbde1-07a0-4474-8ecb-e27e5d338234",
+      "name": "RabbitMQ Trigger1",
+      "credentials": {
+        "rabbitmq": {
+          "id": "h7fzsrX9NMsNKx7v",
+          "name": "RabbitMQ account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd565674-cd9f-4fef-8245-fe3f5a602145",
+              "name": "company_name",
+              "value": "={{ $json.content.parseJson().company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "db75cec7-c08c-4983-b8b6-62c692ddbf12",
+              "name": "domain",
+              "value": "={{ $json.content.parseJson().domain }}",
+              "type": "string"
+            },
+            {
+              "id": "08a85ad4-d589-4ffd-8858-d9542671afe7",
+              "name": "campaign_id",
+              "value": "={{ $json.content.parseJson().campaign_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9128568e-a105-4789-960d-13832b4c05a8",
+              "name": "title",
+              "value": "={{ $json.content.parseJson().title }}",
+              "type": "string"
+            },
+            {
+              "id": "42cc5f6e-d0bd-468e-8672-b7dea63451b2",
+              "name": "status",
+              "value": "={{ $json.content.parseJson().status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2288,
+        16
+      ],
+      "id": "88f74c65-a554-49fa-ab51-134e83f3270a",
+      "name": "Raw Data"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -576,
+        16
+      ],
+      "id": "d896333d-9632-4ae2-a9f7-bbc5cf02f520",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract Domain - company_name forced to the original search query (search_parameters.q or google_url q)\nconst allItems = items || [];\nif (allItems.length === 0) return [];\n\nfunction tryParseURL(u) {\n  try {\n    return new URL(u);\n  } catch (e) {\n    return null;\n  }\n}\n\nfunction cleanHostname(host) {\n  if (!host) return null;\n  host = host.toLowerCase().replace(/^www\\./, '');\n  host = host.replace(/^(ca|en|m|mobile|finance|www|app)\\./, '');\n  return host;\n}\n\nfunction extractDomainFromUrl(url) {\n  if (!url) return null;\n  const parsed = tryParseURL(url);\n  if (parsed && parsed.hostname) return cleanHostname(parsed.hostname);\n  try {\n    const stripped = url.replace(/https?:\\/\\/(www\\.)?/i, '').split('/')[0].split('?')[0];\n    return cleanHostname(stripped) || null;\n  } catch {\n    return null;\n  }\n}\n\nfunction baseDomain(host) {\n  if (!host) return null;\n  const parts = host.split('.');\n  if (parts.length >= 2) return parts[parts.length - 2];\n  return parts[0];\n}\n\n// extract q from google_url\nfunction extractQueryFromGoogleUrl(googleUrl) {\n  if (!googleUrl) return null;\n  const p = tryParseURL(googleUrl);\n  if (p) return p.searchParams.get('q') || null;\n  const m = googleUrl.match(/[?&]q=([^&]+)/);\n  if (m) return decodeURIComponent(m[1].replace(/\\+/g, ' '));\n  return null;\n}\n\nconst badHosts = new Set([\n  \"linkedin.com\",\"crunchbase.com\",\"zoominfo.com\",\"instagram.com\",\n  \"twitter.com\",\"facebook.com\",\"glassdoor.com\",\"bloomberg.com\",\n  \"youtube.com\",\"youtu.be\",\"pinterest.com\",\"yelp.com\",\"maps.google.com\"\n]);\n\nconst outputs = allItems.map((item) => {\n  const input = item.json;\n  const root = Array.isArray(input) ? (input[0] || {}) : input || {};\n\n  // collect top results (max 10)\n  const webResults = root?.organic_results || root?.results || root?.web || root?.data?.web || root?.data?.organic_results || [];\n  const web = Array.isArray(webResults) ? webResults : [];\n  const top = web.slice(0, 10);\n\n  const links = top.map(r => r.link || r.url || r.redirect_link || null);\n  const titles = top.map(r => r.title || r.snippet || null);\n  const domains = links.map(extractDomainFromUrl);\n\n  // PRIMARY: force company_name to the user's original search query\n  let companyNameFromQuery = null;\n  if (root?.search_parameters?.q) {\n    companyNameFromQuery = String(root.search_parameters.q).trim();\n  } else if (root?.google_url) {\n    const q = extractQueryFromGoogleUrl(root.google_url);\n    if (q) companyNameFromQuery = String(q).trim();\n  } else if (root?.search_information?.query_displayed) {\n    companyNameFromQuery = String(root.search_information.query_displayed).trim();\n  }\n\n  // FALLBACK (only if query is completely absent)\n  let fallbackName = null;\n  if (!companyNameFromQuery) {\n    if (root?.knowledge_graph?.title) {\n      fallbackName = String(root.knowledge_graph.title).trim();\n    } else {\n      const goodDomain = domains.find(d => d && ![...badHosts].some(b => d === b || d.endsWith('.' + b)));\n      if (goodDomain) {\n        fallbackName = baseDomain(goodDomain);\n      } else if (domains[0]) {\n        fallbackName = baseDomain(domains[0]);\n      } else if (top[0]?.title) {\n        fallbackName = String(top[0].title).split('|')[0].split('-')[0].trim();\n      }\n    }\n  }\n\n  const companyName = companyNameFromQuery || fallbackName || 'unknown company';\n\n  const out = { company_name: companyName };\n\n  // fill first 10 results\n  for (let i = 0; i < 10; i++) {\n    out[`link${i + 1}`] = links[i] || null;\n    out[`domain${i + 1}`] = domains[i] || null;\n    out[`title${i + 1}`] = titles[i] || null;\n  }\n\n  return { json: out };\n});\n\nreturn outputs;\n"
+      },
+      "id": "c7031465-a66d-43b0-9bf5-1d131ac39055",
+      "name": "Extract Domain",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robust n8n Function node: extract only valid domains (handles multiple input shapes)\n\n// ---------- START OF NODE CODE ----------\ntry {\n  // normalize inputs to array of { json: {...} } objects\n  let rawItems = typeof items !== 'undefined' ? items : [];\n  // If user passed a plain array of objects (not wrapped with { json: ... }), wrap them\n  if (Array.isArray(rawItems) && rawItems.length && !rawItems[0].hasOwnProperty('json')) {\n    rawItems = rawItems.map(x => ({ json: x }));\n  }\n\n  // ensure we always return an array (even if nothing to do)\n  if (!Array.isArray(rawItems) || rawItems.length === 0) {\n    return [];\n  }\n\n  // --- config ---\n  const excludedHosts = [\n    \"facebook.com\",\"linkedin.com\",\"twitter.com\",\"instagram.com\",\n    \"youtube.com\",\"youtu.be\",\"tiktok.com\",\"github.com\",\"pinterest.com\",\n    \"reddit.com\",\"medium.com\",\"snapchat.com\",\"vk.com\",\"github.io\",\"programmerhumor.io\",\n    \"google.com\",\"maps.google.com\",\"bing.com\",\"yelp.com\",\"modd.io\",\"republic.com\",\"bi.team\",\n    \"crunchbase.com\",\"zoominfo.com\",\"glassdoor.com\",\"bloomberg.com\",\"spotify.com\",\"yahoo.com\",\n    \"play.google.com\",\"ideaproof.io\",\"rocketreach.com\",\"zaubacorp.com\",\"x.com\",\"ambitionbox.com\",\n  ];\n\n  // --- helpers ---\n  function extractHostname(input) {\n    if (!input) return null;\n    input = String(input).trim();\n    const emailMatch = input.match(/^[^@]+@(.+)$/);\n    if (emailMatch) return emailMatch[1].toLowerCase().replace(/^www\\./, '').replace(/:\\d+$/, '').trim();\n    try {\n      const url = input.includes('://') ? new URL(input) : new URL('http://' + input);\n      let h = url.hostname.toLowerCase();\n      h = h.replace(/^www\\./, '').replace(/:\\d+$/, '');\n      return h || null;\n    } catch {\n      const stripped = input.replace(/^(https?:\\/\\/)?/i, '').split(/[\\/?#]/)[0].split(':')[0];\n      const h2 = String(stripped).toLowerCase().replace(/^www\\./, '').trim();\n      return h2 || null;\n    }\n  }\n\n  function isValidHostname(host) {\n    if (!host) return false;\n    if (host.length > 253) return false;\n    if (/\\s/.test(host)) return false;\n    const patt = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$/i;\n    return patt.test(host);\n  }\n\n  // attempt to use tldts (self-hosted n8n); if not present, fallback heuristic\n  let useTldts = false;\n  let tldts;\n  try {\n    tldts = require('tldts');\n    useTldts = true;\n  } catch (e) {\n    useTldts = false;\n  }\n\n  function registrableDomain(hostOrUrl) {\n    if (!hostOrUrl) return null;\n    const candidateHost = extractHostname(hostOrUrl) || String(hostOrUrl);\n    if (useTldts) {\n      try {\n        const parsed = tldts.parse(candidateHost);\n        if (parsed && parsed.domain) return parsed.domain.toLowerCase();\n      } catch {}\n    }\n    const parts = candidateHost.split('.');\n    if (parts.length <= 2) return candidateHost.toLowerCase();\n    return parts.slice(-2).join('.').toLowerCase();\n  }\n\n  const excludedSet = new Set(excludedHosts.map(s => registrableDomain(s)));\n\n  // process each input and return only valid domains\n  const outputItems = [];\n\n  for (const it of rawItems) {\n    const json = it.json || {};\n    const validDomains = [];\n    const seenRegs = new Set();\n\n    // gather up to 10 triplets\n    const triplets = [];\n    for (let i = 1; i <= 10; i++) {\n      const link = json[`link${i}`] ?? json[`url${i}`] ?? null;\n      const domainField = json[`domain${i}`] ?? null;\n      const title = json[`title${i}`] ?? json[`tittle${i}`] ?? null;\n      if (link || domainField || title) {\n        triplets.push({ index: i, link, domainField, title });\n      }\n    }\n\n    // process each candidate\n    for (const t of triplets) {\n      const hostFromLink = t.link ? extractHostname(t.link) : null;\n      const hostFromDomain = t.domainField ? extractHostname(t.domainField) : null;\n      const host = hostFromLink || hostFromDomain;\n      const registrable = registrableDomain(host || t.link || t.domainField);\n      \n      if (!registrable || !host) continue;\n\n      // skip excluded domains\n      if (excludedSet.has(registrable)) continue;\n\n      // only include valid hostnames that we haven't seen\n      if (isValidHostname(host) && !seenRegs.has(registrable)) {\n        seenRegs.add(registrable);\n        validDomains.push({\n          domain: registrable,\n          source_link: t.link || t.domainField,\n          title: t.title,\n          original_index: t.index\n        });\n      }\n    }\n\n    // Create output item with only valid domains\n    outputItems.push({\n      json: {\n        company_name: json.company_name ?? null,\n        valid_domains: validDomains,\n        valid_domains_count: validDomains.length\n      }\n    });\n  }\n\n  // RETURN single array of items as n8n expects\n  return outputItems;\n\n} catch (err) {\n  // Return error in proper n8n format\n  return [{ \n    json: { \n      error: \"Processing failed\", \n      error_message: String(err && err.message ? err.message : err)\n    } \n  }];\n}\n// ---------- END OF NODE CODE ----------"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1264,
+        16
+      ],
+      "id": "dbf22bb9-2e1a-490f-b26a-0b772812b9f7",
+      "name": "Remove Public Domains"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "company_name",
+              "value": "={{ $('Raw Data').item.json.company_name }}"
+            },
+            {
+              "name": "link1",
+              "value": "={{ $json.link1 }}"
+            },
+            {
+              "name": "domain1",
+              "value": "={{ $json.domain1 }}"
+            },
+            {
+              "name": "title1",
+              "value": "={{ $json.title1 }}"
+            },
+            {
+              "name": "link2",
+              "value": "={{ $json.link2 }}"
+            },
+            {
+              "name": "domain2",
+              "value": "={{ $json.domain2 }}"
+            },
+            {
+              "name": "title2",
+              "value": "={{ $json.title2 }}"
+            },
+            {
+              "name": "link3",
+              "value": "={{ $json.link3 }}"
+            },
+            {
+              "name": "domain3",
+              "value": "={{ $json.domain3 }}"
+            },
+            {
+              "name": "title3",
+              "value": "={{ $json.title3 }}"
+            },
+            {
+              "name": "link4",
+              "value": "={{ $json.link4 }}"
+            },
+            {
+              "name": "domain4",
+              "value": "={{ $json.domain4 }}"
+            },
+            {
+              "name": "title4",
+              "value": "={{ $json.title4 }}"
+            },
+            {
+              "name": "link5",
+              "value": "={{ $json.link5 }}"
+            },
+            {
+              "name": "domain5",
+              "value": "={{ $json.domain5 }}"
+            },
+            {
+              "name": "tittle5",
+              "value": "={{ $json.title5 }}"
+            },
+            {
+              "name": "link6",
+              "value": "={{ $json.link6 }}"
+            },
+            {
+              "name": "domain6",
+              "value": "={{ $json.domain6 }}"
+            },
+            {
+              "name": "title6",
+              "value": "={{ $json.title6 }}"
+            },
+            {
+              "name": "link7",
+              "value": "={{ $json.link7 }}"
+            },
+            {
+              "name": "domain7",
+              "value": "={{ $json.domain7 }}"
+            },
+            {
+              "name": "title7",
+              "value": "={{ $json.title7 }}"
+            },
+            {
+              "name": "link8",
+              "value": "={{ $json.link8 }}"
+            },
+            {
+              "name": "domain8",
+              "value": "={{ $json.domain8 }}"
+            },
+            {
+              "name": "title8",
+              "value": "={{ $json.title8 }}"
+            },
+            {
+              "name": "link9",
+              "value": "={{ $json.link9 }}"
+            },
+            {
+              "name": "domain9",
+              "value": "={{ $json.domain9 }}"
+            },
+            {
+              "name": "title9",
+              "value": "={{ $json.title9 }}"
+            },
+            {
+              "name": "link10",
+              "value": "={{ $json.link10 }}"
+            },
+            {
+              "name": "domain10",
+              "value": "={{ $json.domain10 }}"
+            },
+            {
+              "name": "title10",
+              "value": "={{ $json.title10 }}"
+            }
+          ],
+          "boolean": [],
+          "options": []
+        },
+        "options": {
+          "dotNotation": false
+        }
+      },
+      "id": "6e8c2a3a-1509-4b09-b4b5-1c1c74272792",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        -1584,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "q": "={{ $json.company_name }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApi",
+      "typeVersion": 1,
+      "position": [
+        -2064,
+        16
+      ],
+      "id": "24847bed-1626-46af-afc5-440a48f1316e",
+      "name": "Google search",
+      "credentials": {
+        "serpApi": {
+          "id": "Kjjl636bwFFPGEZn",
+          "name": "SerpApi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1264,
+        368
+      ],
+      "id": "43b374b4-e7be-4d0e-ba01-6a16c84219a3",
+      "name": "Save Extracted Data"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n\"domain\": \"{{ $json.domain }}\",\n\"company_name\": \"{{ $json.company_name }}\",\n\"isSerpFlow\": true,\n\"campaign_id\": \"{{ $('Raw Data').item.json.campaign_id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -272,
+        112
+      ],
+      "id": "b93ed298-01f2-4f1b-9aed-22ab59d92563",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FhD3JOBK0td85qTC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/FhD3JOBK0td85qTC",
+          "cachedResultName": "CD Enrichment - 1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        80
+      ],
+      "id": "1f781bbd-d592-47e3-83d1-a8eaba1beebc",
+      "name": "Call 'CD Enrichment - 1'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert valid_domains[] array into separate items\n\nconst output = [];\n\nfor (const item of items) {\n  const domains = item.json.valid_domains || [];\n\n  for (const d of domains) {\n    output.push({\n      json: {\n        domain: d.domain,\n        source_link: d.source_link,\n        title: d.title,\n        company_name: item.json.company_name\n      }\n    });\n  }\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        16
+      ],
+      "id": "d8948d34-2701-4624-819f-43da5ba1bc7a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "07f3cf3c-1bbc-44d2-9036-5ab1eb35be34",
+              "leftValue": "={{ $json.correlation }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        128
+      ],
+      "id": "2c9bd66d-a4ee-4a2c-a67b-c0f1e34d44da",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1072,
+        368
+      ],
+      "id": "4056d308-0bbc-4bdf-bd55-221a7bdfc03e",
+      "name": "Store Data1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "4QiTuJ229Mgayoqd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/4QiTuJ229Mgayoqd",
+          "cachedResultName": "CD Status Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        -144
+      ],
+      "id": "2082c5fc-ca7d-4d72-bb25-389b53c73dfb",
+      "name": "Call 'CD Status Workflow'"
+    }
+  ],
+  "pinData": {
+    "RabbitMQ Trigger1": [
+      {
+        "json": {
+          "fields": {
+            "consumerTag": "amq.ctag-pG5ghFwOVj_YJNcoAYAwVA",
+            "deliveryTag": 25,
+            "redelivered": false,
+            "exchange": "",
+            "routingKey": "company-domain-serp"
+          },
+          "properties": {
+            "headers": {}
+          },
+          "content": "{\"company_name\":\"Facile Info Serv\",\"domain\":\"indiamart.com\",\"redirect_domain\":\"\",\"status\":null,\"correlation\":\"false\",\"score\":0.1,\"reason\":\"HTTP status is missing (treated as inactive) and the page title/body clearly show IndiaMART (a large B2B marketplace), not Facile Info Serv, so the domain does not represent the company.\",\"campaign_id\":\"TEST\"}"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "RabbitMQ Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Raw Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raw Data": {
+      "main": [
+        [
+          {
+            "node": "Google search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Call 'CD Status Workflow'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Domain": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Public Domains": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Save Extracted Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Remove Public Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google search": {
+      "main": [
+        [
+          {
+            "node": "Extract Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Call 'CD Enrichment - 1'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'CD Enrichment - 1'": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Extracted Data": {
+      "main": [
+        [
+          {
+            "node": "Store Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2871a7d6-00aa-4fa2-8a96-a20137a794c3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "5466F25YVEU36Lqa",
+  "tags": [
+    {
+      "createdAt": "2025-11-19T07:38:26.907Z",
+      "updatedAt": "2025-11-19T07:38:26.907Z",
+      "id": "TAIcWEIA43iA00aV",
+      "name": "company-domain"
+    }
+  ]
+}

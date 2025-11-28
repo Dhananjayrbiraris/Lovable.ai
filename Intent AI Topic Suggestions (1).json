@@ -1,0 +1,1174 @@
+{
+  "name": "Intent AI Topic Suggestions",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "50025ff5-1b53-475f-b150-2aafef1c4c21",
+              "name": "bucket_name",
+              "type": "string",
+              "value": "bedrock-datasets-training-us-east-1"
+            },
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "name": "file_key",
+              "type": "string",
+              "value": "disintdb.refIntentTopicsBoth.csv"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "288c4012-f8f2-42d3-bcea-508305ba3886",
+      "name": "Set S3 Upload Details1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2704,
+        -2352
+      ],
+      "typeVersion": 3.3
+    },
+    {
+      "parameters": {
+        "bucketName": "bedrock-datasets-training-us-east-1",
+        "fileKey": "={{ $json.file_key }}"
+      },
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 2,
+      "position": [
+        -2448,
+        -2352
+      ],
+      "id": "698e1dfe-8bcc-4866-99a2-7b4c786ed95f",
+      "name": "Download a file1",
+      "credentials": {
+        "aws": {
+          "id": "aZzddU7JY0OGk0e7",
+          "name": "AWS account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "csvLoader",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -1904,
+        -2064
+      ],
+      "id": "5dcab820-85dd-425f-b042-d9f157954425",
+      "name": "Default Data Loader1"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "test_data1",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -2080,
+        -2352
+      ],
+      "id": "8e34d1b2-cae7-4a33-8d65-8377915bc9ec",
+      "name": "Qdrant Vector Store2",
+      "credentials": {
+        "qdrantApi": {
+          "id": "SeNw9dFuxMx5lF81",
+          "name": "QdrantApi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -864,
+        80
+      ],
+      "id": "06a9c569-b3a8-4620-bfc5-55de0d6bcdf3",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\"{{ $json.bodyContent || $json.search || $json.topics || $json.researchType || $json.cleanedContent ||$json.cleaned}}\"",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an **Intent Knowledge-Base Matching Agent**.\n\nYour purpose is to identify the most relevant **Bombora or Foundry (IDG) intent topics** by analyzing the input and referencing the **connected Qdrant vector knowledge base**.\n\n---\n\n### 🧠 Data Inputs\nYou may receive one or more of the following fields:\n- `bodyContent` → website HTML or page text  \n- `pdfText` → extracted text from a document or brochure  \n- `search` → a short keyword or search query  \n- `topics` → optional user-selected topics or hints  \n- `researchType` → input type indicator (document / URL / search)\n\nUse whichever fields are present to understand the context.\n\n---\n\n### ⚙️ Your Task\n\n1. **Understand Context**\n   - Extract key technologies, products, solutions, and research focus areas.  \n   - Identify signals of *buying intent*, *solution discovery*, or *technology evaluation*.\n\n2. **Query the Connected Knowledge Base**\n   - Use the **Vector Store Tool (Qdrant)** to retrieve semantically similar topics from the embedded Bombora / Foundry taxonomy.\n   - Select topics only from the official knowledge base — never invent new ones.\n\n3. **Filter and Decide**\n   - Include only topics that represent *active research*, *evaluation*, *comparison*, or *purchase intent*.\n   - Exclude:\n     - Generic business or department terms  \n     - Job titles or company names  \n     - Broad categories like “IT”, “Software”, “Marketing” unless clearly tied to buying intent  \n     - Any topic not found in the Bombora / Foundry dataset\n\n---\n\n### 🧾 Output Format (MANDATORY)\n\nReturn **only** raw JSON in this exact format:\n\n```json\n{\n  \"intentTopics\": [\"Topic Name 1\", \"Topic Name 2\"]\n}\n```\n\nIf no valid topics are found, return:\n```json\n{\n  \"intentTopics\": []\n}\n```\n\n**Rules:**\n- All topic names must exactly match entries from the knowledge base.  \n- Never fabricate or modify `Topic ID` or topic names.  \n- Do **not** include markdown, commentary, or explanations — only the JSON object.\n\n---\n\n### 🧩 Example\n\n**Input:**\n> We are evaluating cloud-based CRM platforms and customer data tools.\n\n**Output:**\n```json\n{\n  \"intentTopics\": [\"Customer Relationship Management (CRM)\", \"Cloud Computing\"]\n}\n```\n\n---\n\n### 🧭 Matching Behavior\n- Use the **connected Qdrant knowledge base** for all semantic matching.  \n- Base results on similarity and contextual alignment.  \n- Focus on topics that clearly reflect buying, evaluation, or adoption intent.\n\n---\n\n### 📚 Knowledge Base Structure Example\n```json\n{\n  \"Topic ID\": 1504235,\n  \"theme\": \"BioTech\",\n  \"parentCategory\": \"AgriTech\",\n  \"topicName\": \"Botany\",\n  \"vendor\": \"Bombora\"\n}\n```\n\n---\n\n### 🔒 Final Reminder\nOnly output topic names that exist in the connected knowledge base.  \nUse embeddings and retrieval tools to ensure all topics are real.  \nReturn **no text other than the required JSON.**"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -1232,
+        -336
+      ],
+      "id": "b3c13e66-e3aa-44fe-91c9-689c4a86da7e",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        160,
+        -352
+      ],
+      "id": "0deea849-156e-4170-af87-677dbce453bc",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "bodyContent",
+              "cssSelector": "body"
+            }
+          ]
+        },
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        }
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -2432,
+        -464
+      ],
+      "id": "359c6622-bddd-4f0f-8e16-8c2b98fdb267",
+      "name": "HTML1"
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.body.url }}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2784,
+        -400
+      ],
+      "id": "7a3a2f26-dbf2-466c-9ae1-29c15cf9ac43",
+      "name": "HTTP Request1",
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-search-text-1",
+              "name": "search",
+              "type": "string",
+              "value": "={{ $json.body.search }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9335667c-f35e-4ca4-ac7d-6bb99ff30d67",
+      "name": "search1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2464,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e7ec6991-79b4-46b0-b170-42f3a72432eb",
+              "name": "topics",
+              "value": "={{ $json.body.topics[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2464,
+        16
+      ],
+      "id": "fed52c19-c1f6-4c1a-9906-e257331059f0",
+      "name": "topics1"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "=body.document",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -2784,
+        -656
+      ],
+      "id": "898dd599-4b2f-4607-9bda-c1bb510a21a9",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -2208,
+        -1024
+      ],
+      "id": "d569884a-0774-48e9-851c-838ff1011af3",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "jsCode": "function clean(str) {\n    if (!str) return \"\";\n    return String(str)\n        .replace(/\\uFEFF/g, \"\")\n        .replace(/[ \\t]+/g, \" \")\n        .trim();\n}\n\nlet result = \"\";\n\n// Detect PDF output structurally (even if empty)\nconst isPdfExtract =\n    items.length === 1 &&\n    items[0].json &&\n    typeof items[0].json === \"object\" &&\n    \"numpages\" in items[0].json &&\n    \"info\" in items[0].json;\n\n// Case 1 — PDF / DOCX extracted text\nif (isPdfExtract) {\n    const text = items[0].json.text || \"\";\n    result = text\n        .split(\"\\n\")\n        .map(clean)\n        .filter(x => x)\n        .join(\", \");\n}\n\n// Case 2 — Raw base64 TXT/CSV\nelse if (items.length === 1 && items[0].binary && items[0].binary.data) {\n    const base64 = items[0].binary.data.data;\n    const txt = Buffer.from(base64, \"base64\").toString(\"utf8\");\n\n    result = txt\n        .split(\"\\n\")\n        .map(clean)\n        .filter(x => x)\n        .join(\", \");\n}\n\n// Case 3 — CSV/XLSX rows (multiple items)\nelse if (items.length > 1) {\n    const rows = items.map(i => i.json);\n\n    let values = rows.map(row => {\n        const keys = Object.keys(row);\n\n        if (keys.length === 1) {\n            return clean(row[keys[0]]);\n        }\n\n        return clean(Object.values(row).join(\" \"));\n    });\n\n    result = values.filter(x => x).join(\", \");\n}\n\n// Case 4 — Single JSON object\nelse if (items.length === 1 && typeof items[0].json === \"object\") {\n    result = Object.values(items[0].json)\n        .map(clean)\n        .filter(x => x)\n        .join(\", \");\n}\n\nreturn [\n  {\n    json: {\n      cleanedContent: result\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1840,
+        -656
+      ],
+      "id": "7f40c0af-895f-4267-b444-e90476e2d952",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c63af37f-002c-4d11-a2cb-7ad94333766a",
+                    "leftValue": "={{ $json.body.researchType }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "15ea2e88-6da4-4c3b-bc2d-d9d106df79de",
+                    "leftValue": "={{ $json.body.researchType }}",
+                    "rightValue": "url",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "68210cf7-c1c4-48cc-aea4-83ff09a250dc",
+                    "leftValue": "={{ $json.body.researchType }}",
+                    "rightValue": "search",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d03bb3ba-c8b0-40e7-98a3-fd0c33e38fbf",
+                    "leftValue": "={{ $json.body.researchType }}",
+                    "rightValue": "topics",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -3456,
+        -304
+      ],
+      "id": "5848086f-1db4-4212-b835-709e3051d3b1",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "getIntentAISuggestions",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3664,
+        -272
+      ],
+      "id": "8c8cb5fc-8599-4914-ae03-e15c997cbb78",
+      "name": "Webhook1",
+      "webhookId": "6f03adfc-42b8-41d7-bdcc-481538578d13"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this knowledge base to answer questions from the user",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "test_data1",
+          "mode": "id"
+        },
+        "topK": 15,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -1216,
+        16
+      ],
+      "id": "3d2289ae-6c4d-4c7e-ad33-fca76ebb2767",
+      "name": "Qdrant Vector Store3",
+      "credentials": {
+        "qdrantApi": {
+          "id": "SeNw9dFuxMx5lF81",
+          "name": "QdrantApi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1376,
+        -144
+      ],
+      "id": "84f7fedb-12f2-4a90-89dc-1bb3a94d2b4b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1344,
+        176
+      ],
+      "id": "632e1f8d-9636-4537-ba00-0c49cdebb185",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2960,
+        -2352
+      ],
+      "id": "d6d5df22-fe09-4dce-9711-cd3392bdca6c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -2128,
+        -2144
+      ],
+      "id": "0db8d1c0-98e2-4cb6-a692-0f73f6f1499e",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "IQ3IxFEXe41CpALR",
+          "name": "Predictiv"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "topicName, theme, parentCategory",
+        "joinMode": "keepEverything",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -160,
+        -352
+      ],
+      "id": "4a02cb44-5d95-4b72-bdd2-bf6d33e769f2",
+      "name": "Merge",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5805ae49-86bb-4288-937a-625fab55130c",
+              "name": "theme",
+              "value": "={{ $json.theme }}",
+              "type": "string"
+            },
+            {
+              "id": "2a0916a1-138c-42a5-a26a-462bac269e9d",
+              "name": "parentCategory",
+              "value": "={{ $json.parentCategory }}",
+              "type": "string"
+            },
+            {
+              "id": "37de7270-4222-4db3-9d49-919f8322725f",
+              "name": "topicName",
+              "value": "={{ $json.topicName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        -480
+      ],
+      "id": "b2646a14-e56f-4464-9e12-75379ad60c00",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5805ae49-86bb-4288-937a-625fab55130c",
+              "name": "theme",
+              "value": "={{ $json.theme }}",
+              "type": "string"
+            },
+            {
+              "id": "2a0916a1-138c-42a5-a26a-462bac269e9d",
+              "name": "parentCategory",
+              "value": "={{ $json.category }}",
+              "type": "string"
+            },
+            {
+              "id": "37de7270-4222-4db3-9d49-919f8322725f",
+              "name": "topicName",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        -224
+      ],
+      "id": "d683b4c7-ef2c-43ad-a133-5f22e447584c",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "=refFoundryIntentTopics",
+        "query": "={{ \nJSON.stringify([\n  {\n    $match: {\n      $expr: {\n        $in: [\n          { $toLower: \"$name\" },\n          (\n            Array.isArray($json.output?.intentTopics)\n              ? $json.output.intentTopics.map(t => t.toLowerCase())\n              : []\n          )\n        ]\n      }\n    }\n  },\n  {\n    $project: {\n      \"theme\": 1,\n      \"category\": 1,\n      \"name\": 1\n    }\n  }\n])\n}}\n"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -656,
+        -224
+      ],
+      "id": "9887b74b-e44c-4869-bb46-6c296afffd8f",
+      "name": "Aggregate Documents Foundry",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mongoDb": {
+          "id": "TlegmWN1Xb4bfWHA",
+          "name": "MongoDB Dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "=refIntent",
+        "query": "={{ \nJSON.stringify([\n  {\n    // Match any topicName (case-insensitive) against all topics from AI output\n    $match: {\n      $expr: {\n        $in: [\n          { $toLower: \"$topicName\" },\n          (\n            Array.isArray($json.output?.intentTopics)\n              ? $json.output.intentTopics.map(t => t.toLowerCase())\n              : []\n          )\n        ]\n      }\n    }\n  },\n  {\n    // Return only the relevant fields\n    $project: {\n      \"Topic ID\": 1,\n      \"theme\": 1,\n      \"parentCategory\": 1,\n      \"topicName\": 1\n    }\n  }\n])\n}}\n"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        -480
+      ],
+      "id": "f6bdda45-e8c4-40ad-9e86-3f3983acbeaa",
+      "name": "Aggregate Documents Bombora",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mongoDb": {
+          "id": "TlegmWN1Xb4bfWHA",
+          "name": "MongoDB Dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Function node: Deep Cleaner for HTML-like text\n// Input: items with item.json.bodyContent (string)\n// Output: item.json.cleaned (string)\n\nreturn items.map(item => {\n  let text = item.json.bodyContent || item.json.text || '';\n\n  if (!text || typeof text !== 'string') {\n    return { json: { cleaned: '' } };\n  }\n\n  // 1. Normalize escape characters and basic HTML entities\n  text = text\n    .replace(/\\\\n|\\\\r|\\\\t/g, ' ')\n    .replace(/&nbsp;|&amp;|&lt;|&gt;|&copy;/gi, ' ')\n    .replace(/\\s{2,}/g, ' ')\n    .trim();\n\n  // 2. Remove inline SVGs, scripts, styles, and tags\n  text = text\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<svg[\\s\\S]*?<\\/svg>/gi, ' ')\n    .replace(/<[^>]*>/g, ' ');\n\n  // 3. Remove data:image and [data:image] patterns\n  text = text\n    .replace(/data:image[^\\s\\]]+/gi, ' ')\n    .replace(/\\[data:image[^\\]]*\\]/gi, ' ');\n\n  // 4. Extract and replace URLs with tokens\n  const urlRegex = /https?:\\/\\/[^\\s\\]]+/g;\n  const urls = text.match(urlRegex) || [];\n  text = text.replace(urlRegex, 'URLTOKEN');\n\n  // 5. Remove unwanted words and patterns\n  text = text\n    .replace(/\\b(Close|Open|Skip to content|Search|Menu|Login|Request A Demo)\\b/gi, ' ')\n    .replace(/Partner Login/gi, '')\n    .replace(/\\[[^\\]]*\\]/g, ' ')\n    .replace(/\\s{2,}/g, ' ');\n\n  // 6. Remove long form data (like countries) safely\n  text = text.replace(\n    /(Afghanistan|Albania|Zimbabwe)[\\s\\S]*?(Schedule a Free Demo|©|Privacy Policy|Terms of Use)/i,\n    ' [FORM CONTENT REMOVED] '\n  );\n\n  // 7. Keep punctuation for token efficiency\n  text = text.replace(/[^A-Za-z0-9.,:;!?@%&$#/\\-\\n ]+/g, ' ');\n\n  // 8. Add section headers for better structure\n  text = text.replace(/\\b(Services|Solutions|Resources|Partners|Company|Contact Us)\\b/gi, '\\n\\n$1:\\n');\n\n  // 9. Normalize spaces and line breaks\n  text = text.replace(/\\s{2,}/g, ' ').replace(/\\n{2,}/g, '\\n').trim();\n\n  // 10. Reinsert URLs sequentially\n  urls.forEach(url => {\n    text = text.replace('URLTOKEN', url);\n  });\n\n  // 11. Limit output size for safety\n  if (text.length > 400000) {\n    text = text.slice(0, 400000) + '\\n...[TRUNCATED]...';\n  }\n\n  // 12. Return cleaned result\n  return {\n    json: {\n      cleaned: text,\n      token_count: text.split(/\\s+/).length\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2128,
+        -416
+      ],
+      "id": "a46e8a7d-c467-4533-a162-2a2216c8fe33",
+      "name": "Clean Test"
+    },
+    {
+      "parameters": {
+        "content": "## Embedding Intent Topics\nThis is a one time activity.",
+        "height": 528,
+        "width": 1936,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3312,
+        -2432
+      ],
+      "typeVersion": 1,
+      "id": "fed6c3b5-60f9-4ea4-9370-9e71976e25e3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "=text/plain",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bc4da4ce-c279-47e5-90d0-7eeea62ceee2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "49a8dc87-1c1f-4517-8fbe-e1267f557c7c",
+                    "leftValue": "={{ $binary.data.fileExtension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fd8f53bb-5299-459d-89fe-65e3fa21c0b5",
+                    "leftValue": "={{ $binary.data.fileExtension }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -2544,
+        -800
+      ],
+      "id": "f5408c08-e9d0-4862-9b9e-ad65ae70ad74",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -2208,
+        -848
+      ],
+      "id": "d8398828-dd39-478a-9b8f-fac7a12a203c",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -2208,
+        -672
+      ],
+      "id": "0839d520-a01b-4e0e-9600-ee3a7d55f9f7",
+      "name": "Extract from File2"
+    }
+  ],
+  "pinData": {
+    "Webhook1": [
+      {
+        "json": {
+          "headers": {
+            "host": "playground-wa.predictivdata.com",
+            "user-agent": "axios/1.13.2",
+            "content-length": "43",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "content-type": "application/json",
+            "x-forwarded-for": "172.16.8.43",
+            "x-forwarded-host": "playground-wa.predictivdata.com",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "e80ae109b2e7",
+            "x-real-ip": "172.16.8.43"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "researchType": "url",
+            "url": "youtube.com/"
+          },
+          "webhookUrl": "https://playground-wa.predictivdata.com/webhook/getIntentAISuggestions",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Set S3 Upload Details1": {
+      "main": [
+        [
+          {
+            "node": "Download a file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download a file1": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store2",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Documents Bombora",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate Documents Foundry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML1": {
+      "main": [
+        [
+          {
+            "node": "Clean Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTML1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "search1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "topics1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "search1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "topics1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store3": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store3",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set S3 Upload Details1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store2",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Aggregate Documents Foundry": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Documents Bombora": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Test": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "79fba6af-a4c2-4352-b6dc-0a5ffeca8e22",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "PJyW7vwDXaK6uhcX",
+  "tags": []
+}

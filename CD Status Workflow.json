@@ -1,0 +1,157 @@
+{
+  "name": "CD Status Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        -16
+      ],
+      "id": "109aae0c-7e37-4430-859d-ae678b00e3d8",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b831138b-dcd9-44a2-93f3-f1469a6da0cb",
+              "leftValue": "={{ $json.correlation }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        -16
+      ],
+      "id": "c9d7c768-80a6-4480-9254-5ff395f5431c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tal_correlation_status\nSET completed = completed + 1\nWHERE campaign_id = '{{ $json.campaign_id }}' ;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        272,
+        -144
+      ],
+      "id": "088b243f-451c-4025-ba7a-4a063813a313",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "wg3yCfSW5IYdPZAz",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tal_correlation_status\nSET failed = failed + 1\nWHERE campaign_id = '{{ $json.campaign_id }}' ;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        272,
+        80
+      ],
+      "id": "c1eba233-2173-4759-84d6-0c7147ccd21a",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "mySql": {
+          "id": "wg3yCfSW5IYdPZAz",
+          "name": "MySQL account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "company_name": "Facile Info Serv",
+          "domain": "facileserv.com",
+          "redirect_domain": "",
+          "status": 500,
+          "campaign_id": "TEST",
+          "correlation": "false"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "31e362fa-5e2d-4d1c-b670-1cb06a74d7fc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5aac6e2555c46f52c5feb3073cfb00178a705208980c56f87454a885fef1edf3"
+  },
+  "id": "4QiTuJ229Mgayoqd",
+  "tags": [
+    {
+      "createdAt": "2025-11-19T07:38:26.907Z",
+      "updatedAt": "2025-11-19T07:38:26.907Z",
+      "id": "TAIcWEIA43iA00aV",
+      "name": "company-domain"
+    }
+  ]
+}
