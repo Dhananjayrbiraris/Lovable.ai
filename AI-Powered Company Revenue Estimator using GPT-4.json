@@ -1,0 +1,150 @@
+{
+  "name": "AI-Powered Company Revenue Estimator using GPT-4",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "14b11c5d-9b67-4a11-bccf-e7fac5a6ec98",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "company_name",
+              "value": "Acme Corp",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "domain",
+              "value": "acmecorp.com",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "industry",
+              "value": "Software",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "company_size",
+              "value": 150,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6298fa5-3abe-48e5-81dd-7fad9a3cb31d",
+      "name": "Company Input Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "mode": "id",
+          "value": "gpt-4o"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Generate a revenue estimate for the following company:\n\nCompany Name: {{ $json.company_name }}\nDomain: {{ $json.domain }}\nIndustry: {{ $json.industry }}\nCompany Size: {{ $json.company_size }}\n\nReturn JSON only."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "instructions": "=You are an AI Revenue Estimator.\nYour task is to generate a realistic annual revenue estimate for a company based on:\n- Company Name\n- Domain\n- Industry\n- Company Size (number of employees)\n\nYour output must be:\n1. Accurate and plausible based on industry norms.\n2. Data-driven using known revenue-per-employee ranges.\n3. Returned in pure JSON format.\n\nFormat exactly as:\n\n{\n  \"company_name\": \"...\",\n  \"domain\": \"...\",\n  \"industry\": \"...\",\n  \"company_size\": number,\n  \"estimated_annual_revenue_usd\": number,\n  \"revenue_per_employee_usd\": number,\n  \"confidence\": \"high | medium | low\",\n  \"reasoning\": \"Short explanation of the calculation.\"\n}"
+        }
+      },
+      "id": "9b69f8bf-80ce-4331-988a-4cddb5635432",
+      "name": "GPT-4 Revenue Estimator",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JE20R410hJsTJfMI",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json.message;\nconst parsed = JSON.parse(response);\nreturn [{ json: parsed }];"
+      },
+      "id": "53da7560-c1d8-4f57-9c1a-ede7e6189473",
+      "name": "Parse JSON Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Company Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company Input Data": {
+      "main": [
+        [
+          {
+            "node": "GPT-4 Revenue Estimator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4 Revenue Estimator": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "82efddbe-a44f-4f30-8424-757c44acf02e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4e843fbbb0f0a9fafb0ef6c81e4c4ce5bd6b84cc146bac40a16b645b4f8c5d74"
+  },
+  "id": "vqqZZ9Jy2GT20b0k",
+  "tags": []
+}

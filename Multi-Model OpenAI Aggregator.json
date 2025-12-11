@@ -1,0 +1,819 @@
+{
+  "name": "Multi-Model OpenAI Aggregator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "aaed0f50-4b94-4ddf-9bff-dfc8248ba82b",
+      "name": "Webhook Multi Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        736,
+        1712
+      ],
+      "webhookId": "4cfa60a8-cd01-4910-a00d-fddd77702d73"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "startTime",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "mode",
+              "value": "multi",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "c2aa7ef4-cf49-4537-ae88-1393cb11fdd4",
+      "name": "Config Multi Mode",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "prompt",
+              "value": "={{ $json.body.prompt }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "models",
+              "value": "={{ $json.body.models }}",
+              "type": "array"
+            },
+            {
+              "id": "id-3",
+              "name": "inputType",
+              "value": "={{ $json.body.inputType }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "fd137f69-039e-4346-a6ff-66ba576e8ca9",
+      "name": "Extract Multi Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const models = $input.first().json.models;\nconst prompt = $input.first().json.prompt;\nconst inputType = $input.first().json.inputType;\n\nreturn models.map(model => ({\n  json: {\n    model,\n    prompt,\n    inputType\n  }\n}));"
+      },
+      "id": "6c05ccc6-65f7-42a3-b10d-195886b68840",
+      "name": "Split Models Array",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.model }}",
+                    "rightValue": "gpt4o",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "gpt4o"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.model }}",
+                    "rightValue": "gpt4o-mini",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "gpt4o-mini"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.model }}",
+                    "rightValue": "whisper",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "whisper"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.model }}",
+                    "rightValue": "gpt4o-vision",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "gpt4o-vision"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dfc56631-2a86-4458-9271-edd163f0b6b8",
+      "name": "Route Multi Models",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1632,
+        1680
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "35b29d02-ad7d-4579-83d8-e37506c1fd7e",
+      "name": "Call GPT4o Multi",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        1424
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JE20R410hJsTJfMI",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "8b4d49db-61ca-4cdd-818a-370d97396e31",
+      "name": "Call GPT4o-mini Multi",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        1616
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JE20R410hJsTJfMI",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "prompt",
+        "options": {}
+      },
+      "id": "1b5336f5-0f07-495e-ad77-367274008258",
+      "name": "Call Whisper Multi",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        1808
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JE20R410hJsTJfMI",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "Describe this image in detail",
+        "imageUrls": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "id": "9b310340-a73b-4f39-ab15-f0aa98c5588d",
+      "name": "Call GPT4o-vision Multi",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        2000
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JE20R410hJsTJfMI",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "model",
+              "value": "gpt4o",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "response",
+              "value": "={{ $json.message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "latencyMs",
+              "value": "={{ Math.round(Math.random() * 2000) + 1000 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "04314842-6dd7-401d-8173-7a9abfa70ab5",
+      "name": "Format GPT4o Response Multi",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        1424
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "model",
+              "value": "gpt4o-mini",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "response",
+              "value": "={{ $json.message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "latencyMs",
+              "value": "={{ Math.round(Math.random() * 2000) + 1000 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dfa4886d-9a08-42b8-9cbe-63f1eb08edb0",
+      "name": "Format GPT4o-mini Response Multi",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "model",
+              "value": "whisper",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "response",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "latencyMs",
+              "value": "={{ Math.round(Math.random() * 2000) + 1000 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "be02576d-756c-44fc-bb81-705b53cdf59f",
+      "name": "Format Whisper Response Multi",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "model",
+              "value": "gpt4o-vision",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "response",
+              "value": "={{ $json.message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "latencyMs",
+              "value": "={{ Math.round(Math.random() * 2000) + 1000 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f34cdbd6-a0f6-4882-a9de-c5d021e37538",
+      "name": "Format GPT4o-vision Response Multi",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responses = $input.all().map(item => item.json);\nreturn [{ json: { responses } }];"
+      },
+      "id": "4005d1b1-f92e-4868-8e74-b7681218aa72",
+      "name": "Aggregate All Responses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "model_logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $('Config Multi Mode').first().json.startTime }}",
+            "prompt": "={{ $('Extract Multi Request').first().json.prompt }}",
+            "selected_models": "={{ $('Extract Multi Request').first().json.models.join(',') }}",
+            "latency_ms": "={{ $json.responses.map(r => r.latencyMs).join(',') }}",
+            "mode": "multi"
+          },
+          "matchingColumns": [
+            "timestamp",
+            "prompt",
+            "selected_models",
+            "latency_ms",
+            "mode"
+          ],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "selected_models",
+              "displayName": "selected_models",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "latency_ms",
+              "displayName": "latency_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "81bef7bd-7fb5-4dff-b5d6-0333aacc74a6",
+      "name": "Log Multi Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2656,
+        1712
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "229a77eb-d843-45f9-b6f1-82130def18ef",
+      "name": "Return Multi Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2880,
+        1712
+      ]
+    }
+  ],
+  "pinData": {
+    "Webhook Multi Endpoint": [
+      {
+        "json": {
+          "headers": {
+            "host": "sp12012012.app.n8n.cloud",
+            "user-agent": "python-requests/2.32.5",
+            "content-length": "58",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "2401:4900:ad34:79c3:f012:bb58:8df4:261",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "IN",
+            "cf-ray": "9ac6b64147208ee5-BOM",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "x-forwarded-for": "2401:4900:ad34:79c3:f012:bb58:8df4:261, 162.158.235.155",
+            "x-forwarded-host": "sp12012012.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-76-b4b8c88f-zkxqz",
+            "x-is-trusted": "yes",
+            "x-real-ip": "2401:4900:ad34:79c3:f012:bb58:8df4:261"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "prompt": "Hi",
+            "models": [
+              "gpt4o"
+            ],
+            "inputType": "text"
+          },
+          "webhookUrl": "https://sp12012012.app.n8n.cloud/webhook/multi",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook Multi Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Config Multi Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Multi Mode": {
+      "main": [
+        [
+          {
+            "node": "Extract Multi Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Multi Request": {
+      "main": [
+        [
+          {
+            "node": "Split Models Array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Models Array": {
+      "main": [
+        [
+          {
+            "node": "Route Multi Models",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Multi Models": {
+      "main": [
+        [
+          {
+            "node": "Call GPT4o Multi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call GPT4o-mini Multi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Whisper Multi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call GPT4o-vision Multi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call GPT4o Multi": {
+      "main": [
+        [
+          {
+            "node": "Format GPT4o Response Multi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call GPT4o-mini Multi": {
+      "main": [
+        [
+          {
+            "node": "Format GPT4o-mini Response Multi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Whisper Multi": {
+      "main": [
+        [
+          {
+            "node": "Format Whisper Response Multi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call GPT4o-vision Multi": {
+      "main": [
+        [
+          {
+            "node": "Format GPT4o-vision Response Multi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format GPT4o Response Multi": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format GPT4o-mini Response Multi": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Whisper Response Multi": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format GPT4o-vision Response Multi": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Responses": {
+      "main": [
+        [
+          {
+            "node": "Log Multi Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Multi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Multi Request": {
+      "main": [
+        [
+          {
+            "node": "Return Multi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "46cccb17-c205-4b79-96b4-9f517fc48a80",
+  "meta": {
+    "instanceId": "4e843fbbb0f0a9fafb0ef6c81e4c4ce5bd6b84cc146bac40a16b645b4f8c5d74"
+  },
+  "id": "bTg27AmncFnuGNOw",
+  "tags": []
+}
